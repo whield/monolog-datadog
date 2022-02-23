@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 
 namespace MonologDatadog\Handler;
 
@@ -9,7 +9,9 @@ use Exception;
 
 use Monolog\Handler\Curl\Util;
 
-use Monolog\Formatter\JsonFormatter;
+use Monolog\Formatter\FormatterInterface;
+
+use MonologDatadog\Formatter\DatadogFormatter;
 
 /**
  * Sends logs to Datadog Logs using Curl integrations
@@ -26,7 +28,7 @@ class DatadogHandler extends AbstractProcessingHandler
      *
      * @var string
      */
-    protected const DATADOG_LOG_HOST = 'https://http-intake.logs.datadoghq.com';
+    protected const DATADOG_LOG_HOST = 'https://http-intake.logs.datadoghq.eu';
 
     /**
      * Datadog Api Key access
@@ -65,34 +67,38 @@ class DatadogHandler extends AbstractProcessingHandler
     }
 
     /**
-     * Handles a log record
+     * Writes the record down to the log of the implementing handler
+     *
+     * @param  array $record
+     * @return void
      */
-    protected function write(array $record)
+    protected function write(array $record): void
     {
-        $this->send($record['formatted']);
+        $this->send($record);
     }
 
     /**
      * Send request to @link https://http-intake.logs.datadoghq.com on send action.
-     * @param string $record
+     * @param array $record
      */
-    protected function send(string $record)
+    protected function send(array $record): void
     {
         $headers = ['Content-Type:application/json'];
 
         $source = $this->getSource();
         $hostname = $this->getHostname();
         $service = $this->getService($record);
+        $tags = $this->getTags($record);
 
         $url = self::DATADOG_LOG_HOST.'/v1/input/';
         $url .= $this->apiKey;
-        $url .= '?ddsource=' . $source . '&service=' . $service . '&hostname=' . $hostname;
+        $url .= '?ddsource=' . $source . '&service=' . $service . '&hostname=' . $hostname . '&ddtags=' . $tags;
 
         $ch = curl_init();
 
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $record);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $record['formatted']);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
@@ -103,8 +109,10 @@ class DatadogHandler extends AbstractProcessingHandler
     /**
      * Get Datadog Api Key from $attributes params.
      * @param string $apiKey
+     *
+     * @return string
      */
-    protected function getApiKey($apiKey)
+    protected function getApiKey(string $apiKey): string
     {
         if ($apiKey) {
             return $apiKey;
@@ -115,40 +123,68 @@ class DatadogHandler extends AbstractProcessingHandler
 
     /**
      * Get Datadog Source from $attributes params.
-     * @param string $apiKey
+     *
+     * @return string
      */
-    protected function getSource()
+    protected function getSource(): string
     {
-        return !empty($this->attributes['source']) ? $this->attributes['source'] : 'php';
+        return $this->attributes['source'] ?? 'php';
     }
 
     /**
      * Get Datadog Service from $attributes params.
-     * @param string $apiKey
+     * @param array $record
+     *
+     * @return string
      */
-    protected function getService($record)
+    protected function getService($record): string
     {
-        $channel = json_decode($record, true);
-
-        return !empty($this->attributes['service']) ? $this->attributes['service'] : $channel['channel'];
+        return $this->attributes['service'] ?? $record['channel'];
     }
 
     /**
      * Get Datadog Hostname from $attributes params.
-     * @param string $apiKey
+     *
+     * @return string
      */
-    protected function getHostname()
+    protected function getHostname(): string
     {
-        return !empty($this->attributes['hostname']) ? $this->attributes['hostname'] : $_SERVER['SERVER_NAME'];
+        return $this->attributes['hostname'] ?? $_SERVER['SERVER_NAME'];
+    }
+
+    /**
+     * Get Datadog Tags from $attributes params.
+     * @param array $record
+     *
+     * @return string
+     */
+    protected function getTags($record): string
+    {
+        $defaultTag = 'level:' . $record['level_name'];
+
+        if (!isset($this->attributes['tags']) || !$this->attributes['tags']) {
+            return $defaultTag;
+        }
+
+        if (
+            (is_array($this->attributes['tags']) || is_object($this->attributes['tags']))
+            && !empty($this->attributes['tags'])
+        ) {
+            $imploded = implode(',', (array) $this->attributes['tags']);
+
+            return "{$imploded},{$defaultTag}";
+        }
+
+        return $defaultTag;
     }
 
     /**
      * Returns the default formatter to use with this handler
      *
-     * @return JsonFormatter
+     * @return DatadogFormatter
      */
-    protected function getDefaultFormatter()
+    protected function getDefaultFormatter(): FormatterInterface
     {
-        return new JsonFormatter();
+        return new DatadogFormatter();
     }
 }
