@@ -2,44 +2,44 @@
 
 namespace MonologDatadog\Formatter;
 
+use Monolog\Level;
+use Monolog\LogRecord;
 use Monolog\Formatter\JsonFormatter;
-use Monolog\Logger;
 
 class DatadogFormatter extends JsonFormatter
 {
     /**
-     * @var bool
+     * @var bool LogRecord $record
      */
-    protected $includeStacktraces = true;
+    protected bool $includeStacktraces = true;
 
     /**
-     * Map Monolog\Logger levels to Datadog status type
+     * Map Monolog\Level levels to Datadog status type
      */
     private const DATADOG_LEVEL_MAP = [
-        Logger::DEBUG     => 'info',
-        Logger::INFO      => 'info',
-        Logger::NOTICE    => 'warning',
-        Logger::WARNING   => 'warning',
-        Logger::ERROR     => 'error',
-        Logger::ALERT     => 'error',
-        Logger::CRITICAL  => 'error',
-        Logger::EMERGENCY => 'error',
+        Level::Debug->value     => 'info',
+        Level::Info->value      => 'info',
+        Level::Notice->value    => 'warning',
+        Level::Warning->value   => 'warning',
+        Level::Error->value     => 'error',
+        Level::Alert->value    => 'error',
+        Level::Critical->value  => 'error',
+        Level::Emergency->value => 'error',
     ];
 
-    public function format(array $record): string
+    public function format(LogRecord $record): string
     {
         $normalized = $this->normalize($record);
+        $r = $normalized->toArray();
 
-        if (isset($normalized['context']) && $normalized['context'] === []) {
-            $normalized['context'] = new \stdClass;
+        if (isset($r['context']) && $r['context']=== []) {
+            $r['context'] = new \stdClass;
         }
 
-        if (isset($normalized['extra']) && $normalized['extra'] === []) {
-            $normalized['extra'] = new \stdClass;
+        if (isset($r['extra']) && $r['extra'] === []) {
+            $r['extra'] = new \stdClass;
         }
-        
-        $normalized['status'] = static::DATADOG_LEVEL_MAP[$record['level']];
-
+        $r['status'] = static::DATADOG_LEVEL_MAP[$record->level->value];
         return $this->toJson($normalized, true);
     }
 }
