@@ -2,37 +2,35 @@
 
 namespace MonologDatadog\Formatter;
 
-use Monolog\Level;
-use Monolog\LogRecord;
 use Monolog\Formatter\JsonFormatter;
+use Monolog\LogRecord;
 
 class DatadogFormatter extends JsonFormatter
 {
     /**
-     * @var bool LogRecord $record
-     */
-    protected bool $includeStacktraces = true;
-
-    /**
      * Map Monolog\Level levels to Datadog status type
      */
     private const DATADOG_LEVEL_MAP = [
-        Level::Debug->value     => 'info',
-        Level::Info->value      => 'info',
-        Level::Notice->value    => 'warning',
-        Level::Warning->value   => 'warning',
-        Level::Error->value     => 'error',
-        Level::Alert->value    => 'error',
-        Level::Critical->value  => 'error',
-        Level::Emergency->value => 'error',
+        100 => 'info',
+        200 => 'info',
+        250 => 'warning',
+        300 => 'warning',
+        400 => 'error',
+        500 => 'error',
+        550 => 'error',
+        600 => 'error',
     ];
+    /**
+     * @var bool LogRecord $record
+     */
+    protected bool $includeStacktraces = true;
 
     public function format(LogRecord $record): string
     {
         $normalized = $this->normalize($record);
         $r = $normalized->toArray();
 
-        if (isset($r['context']) && $r['context']=== []) {
+        if (isset($r['context']) && $r['context'] === []) {
             $r['context'] = new \stdClass;
         }
 

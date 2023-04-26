@@ -10,7 +10,8 @@ use Monolog\Formatter\FormatterInterface;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Handler\MissingExtensionException;
 use MonologDatadog\Formatter\DatadogFormatter;
-use CurlHandle;
+use RuntimeException;
+
 /**
  * Sends logs to Datadog Logs using Curl integrations
  *
@@ -36,23 +37,25 @@ class DatadogHandler extends AbstractProcessingHandler
     private string $apiKey;
 
     /**
-     * Datadog optionals attributes
+     * Datadog optional attributes
      *
      * @var array
      */
     private array $attributes;
 
     /**
-     * @param string     $apiKey     Datadog Api Key access
-     * @param array      $attributes Some options fore Datadog Logs
-     * @param string|int $level      The minimum logging level at which this handler will be triggered
-     * @param bool       $bubble     Whether the messages that are handled can bubble up the stack or not
+     * @param string $apiKey Datadog Api Key access
+     * @param array $attributes Some options fore Datadog Logs
+     * @param int|string|Level $level The minimum logging level at which this handler will be triggered
+     * @param bool $bubble Whether the messages that are handled can bubble up the stack or not
+     * @throws MissingExtensionException
+     * @throws Exception
      */
     public function __construct(
-        string $apiKey,
-        array $attributes = [],
-        $level = Level::Debug,
-        bool $bubble = true
+        string           $apiKey,
+        array            $attributes = [],
+        int|string|Level $level = Level::Debug,
+        bool             $bubble = true
     ) {
         if (!extension_loaded('curl')) {
             throw new MissingExtensionException('The curl extension is needed to use the DatadogHandler');
@@ -63,35 +66,6 @@ class DatadogHandler extends AbstractProcessingHandler
         $this->attributes = $attributes;
     }
 
-    // /**
-    //  * Loads and returns the shared curl handler for the given endpoint.
-    //  */
-    // protected function getCurlHandler(string $endpoint): CurlHandle
-    // {
-    //     if (!array_key_exists($endpoint, $this->curlHandlers)) {
-    //         $this->curlHandlers[$endpoint] = $this->loadCurlHandle($endpoint);
-    //     }
-
-    //     return $this->curlHandlers[$endpoint];
-    // }
-
-    //     /**
-    //  * Starts a fresh curl session for the given endpoint and returns its handler.
-    //  */
-    // private function loadCurlHandle(string $endpoint): CurlHandle
-    // {
-    //     $url = self::DATADOG_LOG_HOST . '/v1/input/';
-    //     $url .= $this->apiKey;
-    //     $url .= '?ddsource=' . $source . '&service=' . $service . '&hostname=' . $hostname . '&ddtags=' . $tags;
-
-    //     $ch = curl_init();
-
-    //     curl_setopt($ch, CURLOPT_URL, $url);
-    //     curl_setopt($ch, CURLOPT_POST, true);
-    //     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-    //     return $ch;
-    // }
     /**
      * @inheritDoc
      */
@@ -139,9 +113,9 @@ class DatadogHandler extends AbstractProcessingHandler
     {
         if ($apiKey) {
             return $apiKey;
-        } else {
-            throw new Exception('The Datadog Api Key is required');
         }
+
+        throw new RuntimeException('The Datadog Api Key is required');
     }
 
     /**
@@ -189,8 +163,7 @@ class DatadogHandler extends AbstractProcessingHandler
             return $defaultTag;
         }
 
-        if (
-            (is_array($this->attributes['tags']) || is_object($this->attributes['tags']))
+        if ((is_array($this->attributes['tags']) || is_object($this->attributes['tags']))
             && !empty($this->attributes['tags'])
         ) {
             $imploded = implode(',', (array) $this->attributes['tags']);
